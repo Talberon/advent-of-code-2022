@@ -1,7 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Hello, World!");
-
-/*
+﻿/*
  * Rucksack
  * 2 large compartments
  * One item type per rucksack (ie: items in one side should not have a duplicate in the other side)
@@ -22,27 +19,91 @@ Console.WriteLine("Hello, World!");
 
 string[] lines = File.ReadAllLines("./input.txt");
 
-int prioritySum = 0;
-foreach (string line in lines)
+//Part 01
+int FindDuplicatePriorities(string[] rucksacks)
 {
-    int midpoint = line.Length / 2;
-    string leftCompartment = line[..midpoint];
-    string rightCompartment = line[midpoint..];
+    int prioritySum = 0;
+    foreach (string rucksack in rucksacks)
+    {
+        int midpoint = rucksack.Length / 2;
+        string leftCompartment = rucksack[..midpoint];
+        string rightCompartment = rucksack[midpoint..];
 
-    Console.WriteLine($"({leftCompartment} | {rightCompartment})");
+        // Console.WriteLine($"({leftCompartment} | {rightCompartment})");
 
-    char duplicate = rightCompartment.First(c => leftCompartment.Contains(c));
+        char duplicate = rightCompartment.First(c => leftCompartment.Contains(c));
 
-    int priorityValue = (int)Enum.Parse<ItemPriority>(duplicate.ToString());
-    
-    Console.WriteLine($"Found: ({duplicate}), Value: ({priorityValue})");
+        int priorityValue = (int)Enum.Parse<ItemPriority>(duplicate.ToString());
 
-    prioritySum += priorityValue;
+        // Console.WriteLine($"Found: ({duplicate}), Value: ({priorityValue})");
+
+        prioritySum += priorityValue;
+    }
+
+    return prioritySum;
 }
 
-Console.WriteLine($"Total Priority Sum: {prioritySum}");
+Console.WriteLine($"Total Priority Sum: {FindDuplicatePriorities(lines)}");
+
+//Part 02
+int FindGroupPriorities(Queue<string> rucksacks)
+{
+    int prioritySum = 0;
+
+    while (rucksacks.Count > 0)
+    {
+        List<string> group = rucksacks.BatchOf(3);
+        Dictionary<char, int> occurences = new();
+
+        foreach (string rucksack in group)
+        {
+            string distinctItems = new(rucksack.ToCharArray().Distinct().ToArray());
+            
+            Console.WriteLine($"Distinct items: {distinctItems}");
+            
+            foreach (char letter in distinctItems)
+            {
+                if (occurences.ContainsKey(letter)) occurences[letter]++;
+                else
+                {
+                    occurences.Add(letter, 1);
+                }
+            }
+        }
+
+        Console.WriteLine($"Occurences: {string.Join(",", occurences)}");
+
+        var duplicates = occurences.Where(kvp => kvp.Value == 3).Select(kvp => kvp.Key).ToList();
+
+        if (duplicates.Count() > 1) throw new Exception($"There should not be multiple duplicates! Found: {string.Join(",", duplicates)}");
+        
+        char duplicate = duplicates.First();
+        int priorityValue = (int)Enum.Parse<ItemPriority>(duplicate.ToString());
+        
+        Console.WriteLine($"Identified duplicate: {duplicate} which is worth:\t{priorityValue}");
+
+        prioritySum += priorityValue;
+    }
+
+    return prioritySum;
+}
+
+Console.WriteLine($"Total Group Priority Sum: {FindGroupPriorities(new Queue<string>(lines))}");
 
 
+static class QueueExtensions
+{
+    public static List<T> BatchOf<T>(this Queue<T> me, int amountToPop)
+    {
+        List<T> result = new();
+        for (int i = 0; i < amountToPop && me.Count > 0; i++)
+        {
+            result.Add(me.Dequeue());
+        }
+
+        return result;
+    }
+}
 
 enum ItemPriority
 {
