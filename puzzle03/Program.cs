@@ -55,8 +55,41 @@ int SumGroupPriorities(Queue<string> rucksacks, int groupSize)
     return prioritySum;
 }
 
-int prioritySum = SumGroupPriorities(new Queue<string>(lines), 3);
-Console.WriteLine($"Total Group Priority Sum: {prioritySum}");
+int prioritySum = SumGroupPrioritiesLINQ(new Queue<string>(lines), 3);
+Console.WriteLine($"LINQ: Total Group Priority Sum: {prioritySum}");
+
+//Part 02 with LINQ!
+int SumGroupPrioritiesLINQ(Queue<string> rucksacks, int groupSize)
+{
+    int prioritySum = 0;
+    
+    while (rucksacks.Count > 0)
+    {
+        var sackOne = rucksacks.Dequeue().ToCharArray();
+        var sackTwo = rucksacks.Dequeue().ToCharArray();
+        var sackThree = rucksacks.Dequeue().ToCharArray();
+
+        var duplicates = (from item1 in sackOne
+            join item2 in sackTwo on item1 equals item2
+            join item3 in sackThree on item2 equals item3
+            select item1).Distinct().ToList();
+            
+        if (duplicates.Count > 1)
+        {
+            throw new Exception($"There should not be multiple duplicates! Found: {string.Join(",", duplicates)}");
+        }
+
+        char badge = duplicates.First();
+        int priorityValue = (int)Enum.Parse<ItemPriority>(badge.ToString());
+
+        prioritySum += priorityValue;
+    }
+
+    return prioritySum;
+}
+
+int prioritySumLINQ = SumGroupPrioritiesLINQ(new Queue<string>(lines), 3);
+Console.WriteLine($"LINQ: Total Group Priority Sum: {prioritySumLINQ}");
 
 
 //Helpers
@@ -77,6 +110,56 @@ static class QueueExtensions
 enum ItemPriority
 {
     Invalid,
-    a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
-    A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z
+    a,
+    b,
+    c,
+    d,
+    e,
+    f,
+    g,
+    h,
+    i,
+    j,
+    k,
+    l,
+    m,
+    n,
+    o,
+    p,
+    q,
+    r,
+    s,
+    t,
+    u,
+    v,
+    w,
+    x,
+    y,
+    z,
+    A,
+    B,
+    C,
+    D,
+    E,
+    F,
+    G,
+    H,
+    I,
+    J,
+    K,
+    L,
+    M,
+    N,
+    O,
+    P,
+    Q,
+    R,
+    S,
+    T,
+    U,
+    V,
+    W,
+    X,
+    Y,
+    Z
 }
