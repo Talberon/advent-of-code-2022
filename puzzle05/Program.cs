@@ -4,7 +4,19 @@ var lines = new List<string>(File.ReadAllLines("./input.txt"));
 
 string crateIndexLine = lines.First(line => line.StartsWith(" 1"));
 
-List<Stack<char>> GetCrateStacks(IEnumerable<string> lines)
+int instructionStartIndex = lines.IndexOf(crateIndexLine) + 2; //Magic number :(
+List<Stack<char>> crateStacks = ParseCrateStacks(lines);
+List<string> instructionLines = lines.GetRange(instructionStartIndex, lines.Count - instructionStartIndex);
+List<Instruction> instructions = ParseInstructions(instructionLines);
+
+Console.WriteLine("Starting Crate Set:");
+PrintCrates();
+
+//CrateMover9000(instructions, crateStacks);
+CrateMover9001(instructions, crateStacks);
+return;
+
+List<Stack<char>> ParseCrateStacks(IEnumerable<string> lines)
 {
     //K: Stack Number, V: String Index
     var stackIndexes = new Dictionary<int, int>(
@@ -14,8 +26,6 @@ List<Stack<char>> GetCrateStacks(IEnumerable<string> lines)
                 : new KeyValuePair<int, int>()
         ).Where(kvp => kvp.Key is not 0)
     );
-
-    Console.WriteLine($"Stack Indexes: {string.Join(", ", stackIndexes)}");
 
     string[] stackStrings = lines.Where(line => line.Trim().StartsWith("[")).Reverse().ToArray();
 
@@ -38,50 +48,54 @@ List<Stack<char>> GetCrateStacks(IEnumerable<string> lines)
 
 List<Instruction> ParseInstructions(List<string> lines)
 {
-    List<Instruction> instructions = new();
-
-    foreach (string line in lines)
-    {
-        List<string> segments = line.Split(" ").Where(segment => segment.All(char.IsDigit)).ToList();
-
-        var instruction = new Instruction
+    return lines.Select(line => line.Split(" ")
+        .Where(segment => segment.All(char.IsDigit)).ToList()).Select(segments => new Instruction
         {
             CrateCount = Convert.ToInt32(segments[0]),
             IndexOrigin = Convert.ToInt32(segments[1]) - 1,
             IndexDestination = Convert.ToInt32(segments[2]) - 1
-        };
-
-        instructions.Add(instruction);
-    }
-
-    return instructions;
+        }
+    ).ToList();
 }
 
-int instructionStartIndex = lines.IndexOf(crateIndexLine) + 2; //Magic number :(
-Console.WriteLine($"Instruction start index: {instructionStartIndex}");
-
-List<Stack<char>> crateStacks = GetCrateStacks(lines);
-List<Instruction> instructions =
-    ParseInstructions(lines.GetRange(instructionStartIndex, lines.Count - instructionStartIndex));
-
-Console.WriteLine("Starting Crate Set:");
-PrintCrates();
-
-foreach (Instruction instruction in instructions)
+void CrateMover9000(List<Instruction> list, List<Stack<char>> crateStacks)
 {
-    for (int i = 0; i < instruction.CrateCount; i++)
+    foreach (Instruction instruction in list)
     {
-        char movingCrate = crateStacks[instruction.IndexOrigin].Pop();
-        crateStacks[instruction.IndexDestination].Push(movingCrate);
+        for (int i = 0; i < instruction.CrateCount; i++)
+        {
+            char movingCrate = crateStacks[instruction.IndexOrigin].Pop();
+            crateStacks[instruction.IndexDestination].Push(movingCrate);
+        }
+
+        Console.WriteLine(
+            $"Moving {instruction.CrateCount} crate(s) from {instruction.IndexOrigin + 1} to {instruction.IndexDestination + 1}");
+
+        PrintCrates();
     }
-
-    Console.WriteLine(
-        $"Moving {instruction.CrateCount} crate(s) from {instruction.IndexOrigin + 1} to {instruction.IndexDestination + 1}");
-
-    PrintCrates();
 }
 
-Console.WriteLine("Done!");
+void CrateMover9001(List<Instruction> list, List<Stack<char>> crateStacks)
+{
+    foreach (Instruction instruction in list)
+    {
+        Stack<char> craneCapacity = new();
+        for (int i = 0; i < instruction.CrateCount; i++)
+        {
+            craneCapacity.Push(crateStacks[instruction.IndexOrigin].Pop());
+        }
+
+        foreach (char crate in craneCapacity)
+        {
+            crateStacks[instruction.IndexDestination].Push(crate);
+        }
+
+        Console.WriteLine(
+            $"Moving {instruction.CrateCount} crate(s) SIMULTANEOUSLY from {instruction.IndexOrigin + 1} to {instruction.IndexDestination + 1}");
+
+        PrintCrates();
+    }
+}
 
 void PrintCrates()
 {
