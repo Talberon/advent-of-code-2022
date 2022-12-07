@@ -1,29 +1,52 @@
 ﻿string[] lines = System.IO.File.ReadAllLines("./input");
 
-// $ cd $LETTER - move in one level
-// $ cd .. - move out one level
-// $ cd / - moves to root
-// $ ls - list files and folder in current level
+Folder fileSystem = ParseFileSystem(lines);
 
 const int MaxSize = 100_000;
+int part01 = TotalOfLimitedFolderSize(MaxSize, fileSystem);
+Console.WriteLine($"Total Of Folders with size under {MaxSize}: {part01}");
 
-var fileSystem = ParseFileSystem(lines);
+const int TotalDiskSpace = 70_000_000;
+const int RequiredUnusedSpace = 30_000_000;
+int usedSpace = fileSystem.GetSize();
+int currentUnusedSpace = TotalDiskSpace - usedSpace;
+int spaceNeeded = RequiredUnusedSpace - currentUnusedSpace;
+int part02 = SizeOfSmallestDirectoryToClearUpSpace(spaceNeeded, fileSystem);
+Console.WriteLine($"Size of folder that can clear up {spaceNeeded} space: {part02}");
 
-List<Folder> fittedFolders = new();
+int SizeOfSmallestDirectoryToClearUpSpace(int spaceNeeded, Folder system) => GetAllFolders(system)
+    .Select(folder => folder.GetSize()).Where(i => i > spaceNeeded).MinBy(i => i);
 
-if (fileSystem.GetSize() <= MaxSize)
+int TotalOfLimitedFolderSize(int maxSize, Folder fileSystem)
 {
-    fittedFolders.Add(fileSystem);
+    List<Folder> fittedFolders = new();
+
+    if (fileSystem.GetSize() <= maxSize)
+    {
+        fittedFolders.Add(fileSystem);
+    }
+
+    fittedFolders.AddRange(GetFoldersOfMaximumSize(maxSize, fileSystem));
+
+    int totalOfLimitedFolderSize = fittedFolders.Sum(f => f.GetSize());
+
+    return totalOfLimitedFolderSize;
 }
 
-fittedFolders.AddRange(GetFoldersOfSize(MaxSize, fileSystem));
+List<Folder> GetAllFolders(Folder root)
+{
+    var result = new List<Folder>();
 
-int totalOfLimitedFolderSize = fittedFolders.Sum(f => f.GetSize());
-Console.WriteLine($"Sum: {totalOfLimitedFolderSize}");
+    foreach (Folder folder in root.Folders)
+    {
+        result.Add(folder);
+        result.AddRange(GetAllFolders(folder));
+    }
 
-return;
+    return result;
+}
 
-List<Folder> GetFoldersOfSize(int maxSize, Folder root)
+List<Folder> GetFoldersOfMaximumSize(int maxSize, Folder root)
 {
     var result = new List<Folder>();
 
@@ -34,7 +57,7 @@ List<Folder> GetFoldersOfSize(int maxSize, Folder root)
             result.Add(folder);
         }
 
-        result.AddRange(GetFoldersOfSize(maxSize, folder));
+        result.AddRange(GetFoldersOfMaximumSize(maxSize, folder));
     }
 
     return result;
@@ -55,7 +78,7 @@ Folder ParseFileSystem(string[] input)
     {
         string[] segments = line.Split(" ");
 
-        var firstSegment = segments[0];
+        string firstSegment = segments[0];
 
         if (firstSegment == "$")
         {
@@ -77,10 +100,6 @@ Folder ParseFileSystem(string[] input)
                 {
                     currentFolder = currentFolder.Folders.First(folder => folder.Name == desiredFolder);
                 }
-            }
-            else if (command == "ls")
-            {
-                continue;
             }
         }
         else if (firstSegment == "dir")
