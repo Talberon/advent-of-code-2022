@@ -14,40 +14,27 @@
 const bool devMode = false;
 Action<string?> debugConsole = devMode ? Console.WriteLine : (_) => { };
 
-//
-// Point a = new Point(2, 3);
-// Point b = new Point(1, 2);
-// debugConsole($"Distance from A({a}) and B({b}): {a.DistanceFrom(b)}");
-//
-// a = new Point(2, 3);
-// b = new Point(3, 4);
-// debugConsole($"Distance from A({a}) and B({b}): {a.DistanceFrom(b)}");
-//
-// a = new Point(2, 3);
-// b = new Point(3, 5);
-// debugConsole($"Distance from A({a}) and B({b}): {a.DistanceFrom(b)}");
-//
-// return;
-
 string[] lines = File.ReadAllLines("input");
 
-var head = Point.Empty;
-var tail = Point.Empty;
-List<Point> tailHistory = new() { tail };
+const int chainLength = 10;
+List<Point> chain = new();
 
-debugConsole($"START: Head: {head}\tTail: {tail}\n");
+for (int i = 0; i < chainLength; i++) chain.Add(new Point());
 
+List<Point> tailHistory = new() { chain[^1] };
+
+
+debugConsole($"START: Chain | {string.Join(", ", chain)}\n");
 
 foreach (string line in lines)
 {
     string[] segments = line.Split(" ");
     (string direction, int steps) = (segments[0], Convert.ToInt32(segments[1]));
 
-    for (int i = 1; i <= steps; i++)
+    for (int step = 1; step <= steps; step++)
     {
-        debugConsole($"Head moves {i}/{steps} steps to the {direction}");
-
-        head = direction switch
+        Point head = chain[0];
+        chain[0] = direction switch
         {
             "U" => head.MoveUp,
             "D" => head.MoveDown,
@@ -56,60 +43,74 @@ foreach (string line in lines)
             _ => Point.Empty
         };
 
-        bool isDiagonal = (tail.X != head.X && tail.Y != head.Y);
-        int distanceFrom = tail.DistanceFrom(head);
-        bool areTouching = distanceFrom <= 1;
+        debugConsole($"Head moves {step}/{steps} steps to the {direction} | H:{chain[0]}");
 
-        debugConsole($"Distance from Tail and Head: {distanceFrom} | T:{tail}\tH:{head}");
-        if (isDiagonal) debugConsole($"Tail is diagonal from Head | T:{tail}\tH:{head}");
 
-        if (!areTouching)
+        for (int knot = 0; knot < chain.Count - 1; knot++)
         {
-            tail = FollowLeader(tail, head);
-
-            tailHistory.Add(tail);
-
-            Point FollowLeader(Point follower, Point leader)
-            {
-                if (follower.IsAbove(leader))
-                {
-                    follower = follower.MoveDown;
-                }
-
-                if (follower.IsUnder(leader))
-                {
-                    follower = follower.MoveUp;
-                }
-
-                if (follower.IsLeftOf(leader))
-                {
-                    follower = follower.MoveRight;
-                }
-
-                if (follower.IsRightOf(leader))
-                {
-                    follower = follower.MoveLeft;
-                }
-
-                return follower;
-            }
-
-            debugConsole($"Tail has moved | T:{tail}\tH:{head}");
-        }
-        else
-        {
-            debugConsole($"Tail doesn't have to move | T:{tail}\tH:{head}");
+            Point leader = chain[knot];
+            Point follower = chain[knot + 1];
+            debugConsole($"Leader [{knot}]: {leader} | Follower [{knot + 1}]: {follower}");
+            chain[knot + 1] = FollowKnot(leader, follower);
         }
 
-        Console.WriteLine();
+        debugConsole($"Chain | {string.Join(", ", chain)}\n");
+        tailHistory.Add(chain[^1]);
     }
-}
 
+}
 
 Console.WriteLine($"Tiles visited by Tail: \n{string.Join("\n", tailHistory)}");
 
 Console.WriteLine($"Distinct Tiles visited by Tail: {tailHistory.Distinct().Count()}");
 
+Point FollowKnot(Point leader, Point follower)
+{
+    bool isDiagonal = (follower.X != leader.X && follower.Y != leader.Y);
+    int distanceFrom = follower.DistanceFrom(leader);
+    bool areTouching = distanceFrom <= 1;
+
+    // debugConsole($"Distance from Tail and Head: {distanceFrom} | T:{follower}\tH:{leader}");
+    // if (isDiagonal) debugConsole($"Tail is diagonal from Head | T:{follower}\tH:{leader}");
+
+    if (!areTouching)
+    {
+        follower = FollowLeader(follower, leader);
+
+        Point FollowLeader(Point follower, Point leader)
+        {
+            if (follower.IsAbove(leader))
+            {
+                follower = follower.MoveDown;
+            }
+
+            if (follower.IsUnder(leader))
+            {
+                follower = follower.MoveUp;
+            }
+
+            if (follower.IsLeftOf(leader))
+            {
+                follower = follower.MoveRight;
+            }
+
+            if (follower.IsRightOf(leader))
+            {
+                follower = follower.MoveLeft;
+            }
+
+            return follower;
+        }
+
+        debugConsole($"Follower has moved | F:{follower}\tL:{leader}");
+    }
+    else
+    {
+        debugConsole($"Follower doesn't have to move | F:{follower}\tL:{leader}");
+    }
+
+    return follower;
+}
 
 internal struct Point
 {
