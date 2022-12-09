@@ -1,5 +1,6 @@
 ﻿//Day 09: Rope Bridge
 
+// Rules:
 // Head and Tail must always be touching
 // If Head is 2 steps away cardinally, move Tail cardinally
 // If Head and Tail NOT TOUCHING and not in same X or Y, Tail moves diagonally
@@ -11,20 +12,14 @@
 //   0 1 2 3
 //      X
 
-const bool devMode = false;
-Action<string?> debugConsole = devMode ? Console.WriteLine : (_) => { };
-
 string[] lines = File.ReadAllLines("input");
 
 const int chainLength = 10;
-List<Point> chain = new();
+List<Knot> chain = new();
 
-for (int i = 0; i < chainLength; i++) chain.Add(new Point());
+for (int i = 0; i < chainLength; i++) chain.Add(Knot.Empty);
 
-List<Point> tailHistory = new() { chain[^1] };
-
-
-debugConsole($"START: Chain | {string.Join(", ", chain)}\n");
+List<Knot> tailHistory = new() { chain[^1] };
 
 foreach (string line in lines)
 {
@@ -33,91 +28,37 @@ foreach (string line in lines)
 
     for (int step = 1; step <= steps; step++)
     {
-        Point head = chain[0];
-        chain[0] = direction switch
+        chain[0] += direction switch
         {
-            "U" => head.MoveUp,
-            "D" => head.MoveDown,
-            "L" => head.MoveLeft,
-            "R" => head.MoveRight,
-            _ => Point.Empty
+            "U" => Knot.Up,
+            "D" => Knot.Down,
+            "L" => Knot.Left,
+            "R" => Knot.Right,
+            _ => throw new ArgumentOutOfRangeException()
         };
 
-        debugConsole($"Head moves {step}/{steps} steps to the {direction} | H:{chain[0]}");
-
-
-        for (int knot = 0; knot < chain.Count - 1; knot++)
+        for (int i = 0; i < chain.Count - 1; i++)
         {
-            Point leader = chain[knot];
-            Point follower = chain[knot + 1];
-            debugConsole($"Leader [{knot}]: {leader} | Follower [{knot + 1}]: {follower}");
-            chain[knot + 1] = FollowKnot(leader, follower);
+            Knot leader = chain[i];
+            Knot follower = chain[i + 1];
+
+            chain[i + 1] = follower.FollowKnot(leader);
         }
 
-        debugConsole($"Chain | {string.Join(", ", chain)}\n");
         tailHistory.Add(chain[^1]);
     }
-
 }
-
-Console.WriteLine($"Tiles visited by Tail: \n{string.Join("\n", tailHistory)}");
 
 Console.WriteLine($"Distinct Tiles visited by Tail: {tailHistory.Distinct().Count()}");
 
-Point FollowKnot(Point leader, Point follower)
+internal readonly struct Knot
 {
-    bool isDiagonal = (follower.X != leader.X && follower.Y != leader.Y);
-    int distanceFrom = follower.DistanceFrom(leader);
-    bool areTouching = distanceFrom <= 1;
+    public int X { get; }
+    public int Y { get; }
 
-    // debugConsole($"Distance from Tail and Head: {distanceFrom} | T:{follower}\tH:{leader}");
-    // if (isDiagonal) debugConsole($"Tail is diagonal from Head | T:{follower}\tH:{leader}");
+    public static Knot Empty => new(0, 0);
 
-    if (!areTouching)
-    {
-        follower = FollowLeader(follower, leader);
-
-        Point FollowLeader(Point follower, Point leader)
-        {
-            if (follower.IsAbove(leader))
-            {
-                follower = follower.MoveDown;
-            }
-
-            if (follower.IsUnder(leader))
-            {
-                follower = follower.MoveUp;
-            }
-
-            if (follower.IsLeftOf(leader))
-            {
-                follower = follower.MoveRight;
-            }
-
-            if (follower.IsRightOf(leader))
-            {
-                follower = follower.MoveLeft;
-            }
-
-            return follower;
-        }
-
-        debugConsole($"Follower has moved | F:{follower}\tL:{leader}");
-    }
-    else
-    {
-        debugConsole($"Follower doesn't have to move | F:{follower}\tL:{leader}");
-    }
-
-    return follower;
-}
-
-internal struct Point
-{
-    public int X { get; set; }
-    public int Y { get; set; }
-
-    public Point(int x, int y)
+    private Knot(int x, int y)
     {
         X = x;
         Y = y;
@@ -129,12 +70,15 @@ internal struct Point
         y = Y;
     }
 
-    public static Point operator +(Point a, Point b) => new Point(a.X + b.X, a.Y + b.Y);
-    public static Point operator -(Point a, Point b) => new Point(a.X - b.X, a.Y - b.Y);
+    public Knot FollowKnot(Knot leader)
+    {
+        int distanceFrom = DistanceFrom(leader);
+        bool areTouching = distanceFrom <= 1;
 
-    public static Point Empty => new(0, 0);
+        return !areTouching ? MoveToward(leader) : this;
+    }
 
-    public int DistanceFrom(Point other)
+    private int DistanceFrom(Knot other)
     {
         (int otherX, int otherY) = other;
         int deltaX = Math.Abs(otherX - X);
@@ -146,27 +90,30 @@ internal struct Point
         return Convert.ToInt32(Math.Sqrt(2) * diagonalSteps + straightSteps);
     }
 
-    public bool IsAbove(Point other) => Y > other.Y;
-    public bool IsUnder(Point other) => Y < other.Y;
-    public bool IsLeftOf(Point other) => X < other.X;
-    public bool IsRightOf(Point other) => X > other.X;
-
-    public Point MoveUp => this + new Point(0, 1);
-    public Point MoveDown => this + new Point(0, -1);
-    public Point MoveLeft => this + new Point(-1, 0);
-    public Point MoveRight => this + new Point(1, 0);
-
-    public Point Copy => new(X, Y);
-
-    public bool Equals(Point other)
+    private Knot MoveToward(Knot other)
     {
-        return X == other.X && Y == other.Y;
+        Knot temp = this;
+
+        if (temp.IsAbove(other)) temp += Down;
+        if (temp.IsUnder(other)) temp += Up;
+        if (temp.IsLeftOf(other)) temp += Right;
+        if (temp.IsRightOf(other)) temp += Left;
+
+        return temp;
     }
 
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(X, Y);
-    }
+    private bool IsAbove(Knot other) => Y > other.Y;
+    private bool IsUnder(Knot other) => Y < other.Y;
+    private bool IsLeftOf(Knot other) => X < other.X;
+    private bool IsRightOf(Knot other) => X > other.X;
+
+    public static Knot Up => new (0, 1);
+    public static Knot Down => new (0, -1);
+    public static Knot Left => new (-1, 0);
+    public static Knot Right => new (1, 0);
+
+    public static Knot operator +(Knot a, Knot b) => new(a.X + b.X, a.Y + b.Y);
+    public static Knot operator -(Knot a, Knot b) => new(a.X - b.X, a.Y - b.Y);
 
     public override string ToString() => $"(X:{X}, Y:{Y})";
 }
