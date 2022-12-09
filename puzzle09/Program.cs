@@ -2,7 +2,7 @@
 
 // Head and Tail must always be touching
 // If Head is 2 steps away cardinally, move Tail cardinally
-// If Head and Tail not touching and not in same X or Y, Tail moves diagonally
+// If Head and Tail NOT TOUCHING and not in same X or Y, Tail moves diagonally
 
 // Grid orientation
 //   3
@@ -11,19 +11,37 @@
 //   0 1 2 3
 //      X
 
+const bool devMode = false;
+Action<string?> debugConsole = devMode ? Console.WriteLine : (_) => { };
+
+//
+// Point a = new Point(2, 3);
+// Point b = new Point(1, 2);
+// debugConsole($"Distance from A({a}) and B({b}): {a.DistanceFrom(b)}");
+//
+// a = new Point(2, 3);
+// b = new Point(3, 4);
+// debugConsole($"Distance from A({a}) and B({b}): {a.DistanceFrom(b)}");
+//
+// a = new Point(2, 3);
+// b = new Point(3, 5);
+// debugConsole($"Distance from A({a}) and B({b}): {a.DistanceFrom(b)}");
+//
+// return;
+
 string[] lines = File.ReadAllLines("input");
 
 var head = Point.Empty;
 var tail = Point.Empty;
 List<Point> tailHistory = new() { tail };
 
-const bool devMode = false;
-Action<string?> debugConsole = devMode ? Console.WriteLine : (_) => { };
 debugConsole($"START: Head: {head}\tTail: {tail}\n");
+
 
 foreach (string line in lines)
 {
-    (string direction, int steps) = (line[0].ToString(), Convert.ToInt32(line[2].ToString()));
+    string[] segments = line.Split(" ");
+    (string direction, int steps) = (segments[0], Convert.ToInt32(segments[1]));
 
     for (int i = 1; i <= steps; i++)
     {
@@ -39,10 +57,13 @@ foreach (string line in lines)
         };
 
         bool isDiagonal = (tail.X != head.X && tail.Y != head.Y);
-        bool isDistant = tail.DistanceFrom(head) > 1;
-        if (isDistant) debugConsole($"Tail is distant from Head | T:{tail}\tH:{head}");
+        int distanceFrom = tail.DistanceFrom(head);
+        bool areTouching = distanceFrom <= 1;
+
+        debugConsole($"Distance from Tail and Head: {distanceFrom} | T:{tail}\tH:{head}");
         if (isDiagonal) debugConsole($"Tail is diagonal from Head | T:{tail}\tH:{head}");
-        if (isDistant)
+
+        if (!areTouching)
         {
             tail = FollowLeader(tail, head);
 
