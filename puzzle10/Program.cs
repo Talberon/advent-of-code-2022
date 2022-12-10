@@ -1,8 +1,10 @@
 ﻿// Day 10: Cathode-Ray Tube
 
-var lines = new Queue<string>(File.ReadAllLines("test_input"));
+using System.Text.RegularExpressions;
 
-const bool debugMode = false;
+var lines = new Queue<string>(File.ReadAllLines("input"));
+
+const bool debugMode = true;
 Action<string?> debugConsole = debugMode ? Console.WriteLine : (_) => { };
 
 // `addx V` takes two cycles to complete. After two cycles, the X register is increased by the value V. (V can be negative.)
@@ -40,12 +42,18 @@ int x = 1;
 int signalStrengthTotal = 0;
 
 
-for (int cycle = 1; cycle <= intervalsToCheck[^1]; cycle++)
+const int totalCycles = crtWidth * crtHeight; // Part 01: intervalsToCheck[^1];
+
+for (int cycle = 1; cycle <= totalCycles; cycle++)
 {
+    debugConsole($"[Cycle {cycle:000}] X = {x:000}");
+    debugConsole($"[Cycle {cycle:000}] Current CRT Row: {crtScreen}");
+
     if (pending.cyclesRemaining > 0)
     {
         pending.cyclesRemaining--;
         UpdateSignalStrength();
+        UpdateSprite();
         continue;
     }
 
@@ -54,10 +62,12 @@ for (int cycle = 1; cycle <= intervalsToCheck[^1]; cycle++)
         x += pending.addition;
     }
 
+
     UpdateSignalStrength();
+    UpdateSprite();
 
     string line = lines.Count > 0 ? lines.Dequeue() : "";
-    debugConsole($"[{cycle:000}] Start cycle \t{cycle}: begin executing {line}");
+    debugConsole($"[Cycle {cycle:000}] Read Command: {line}");
 
     if (line.StartsWith("addx"))
     {
@@ -74,13 +84,27 @@ for (int cycle = 1; cycle <= intervalsToCheck[^1]; cycle++)
     void UpdateSignalStrength()
     {
         if (!intervalsToCheck.Contains(cycle)) return;
-        debugConsole($"[{cycle:000}] X = {x}");
+        debugConsole($"[Cycle {cycle:000}] X = {x}");
         signalStrengthTotal += x * cycle;
+    }
+
+    void UpdateSprite()
+    {
+        int column = crtScreen.Length % crtWidth;
+        if (x - 1 == column || x == column || x + 1 == column)
+        {
+            crtScreen += "#";
+        }
+        else
+        {
+            crtScreen += ".";
+        }
     }
 }
 
 //Assumes input ends with several no-ops.
 Console.WriteLine($"Done! Total Signal Strength: {signalStrengthTotal}");
+Console.WriteLine($"Screen:\n{Regex.Replace(crtScreen, "(.{" + crtWidth + "})", "$1" + Environment.NewLine)}");
 
 
 // int totalCycles = lines.Select(line => line.StartsWith("addx") ? 2 : 1).Sum();
