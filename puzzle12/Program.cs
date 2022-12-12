@@ -7,89 +7,110 @@
 //Can move to a destination at most one higher eg. g->h or b->c etc.
 //Can jump down eg. l->c or e->d or z->a
 
-
 string[] lines = File.ReadAllLines("input");
 
-List<List<GridCell>> grid =
-    lines.Select(
-        line => line.Select(letter => new GridCell
-        {
-            Letter = letter,
-            DistanceFromOrigin = null
-        }).ToList()
-    ).ToList();
+List<List<GridCell>> grid = lines.Select(line => line.Select(
+    letter => new GridCell
+    {
+        Letter = letter,
+        DistanceFromOrigin = null
+    }
+).ToList()).ToList();
 
 
-Stack<Position> visited = new();
-
-Position currentPosition = GetPositionsOf('S').First();
+Position startingPoint = GetPositionsOf('S').First();
 Position summit = GetPositionsOf('E').First();
 
-Console.WriteLine($"Start: {currentPosition} | Summit: {summit}");
-PrintGrid(grid, currentPosition, summit);
-
-//From starting point, create a DistanceFromOrigin grid tracking the cost
-SetDistanceFromOriginAtPosition(currentPosition, 0);
-
-int currentDistance = 0;
-
-while (grid[summit.Y][summit.X].DistanceFromOrigin is null)
+int DistanceToSummit(Position start, Position destination)
 {
-    //New strategy
+    //Reset the mountain
+    grid.ForEach(row => row.ForEach(col => col.DistanceFromOrigin = null));
 
-    //Beginning with start point, update DistanceFromOrigins for each legal move around current distance
+    Console.WriteLine($"Start: {start} | Summit: {destination}");
 
-    List<Position> maxDistanceCells = new();
-    for (int row = 0; row < grid.Count; row++)
+    //From starting point, create a DistanceFromOrigin grid tracking the cost
+    grid[start.Y][start.X].DistanceFromOrigin = 0;
+
+    int distanceToSummit = 0;
+
+    //Break and return -1 if we are stuck in a hole
+    int distanceCellsThisRound;
+    int distanceCellsLastRound = 0;
+
+    while (grid[destination.Y][destination.X].DistanceFromOrigin is null)
     {
-        for (int col = 0; col < grid[0].Count; col++)
+        //Beginning with start point, update DistanceFromOrigins for each legal move around current distance
+
+        List<Position> maxDistanceCells = new();
+        for (int row = 0; row < grid.Count; row++)
         {
-            if (grid[row][col].DistanceFromOrigin == currentDistance)
+            for (int col = 0; col < grid[0].Count; col++)
             {
-                maxDistanceCells.Add(new Position { X = col, Y = row });
+                if (grid[row][col].DistanceFromOrigin == distanceToSummit)
+                {
+                    maxDistanceCells.Add(new Position { X = col, Y = row });
+                }
             }
         }
-    }
 
-    foreach (Position position in maxDistanceCells)
-    {
-        currentPosition = position;
-
-        List<GridCell> legalCells = new List<Position>
-            {
-                currentPosition + Position.Down,
-                currentPosition + Position.Right,
-                currentPosition + Position.Up,
-                currentPosition + Position.Left,
-            }
-            .Where(pos => pos.X >= 0 && pos.Y >= 0 && pos.X < grid[0].Count && pos.Y < grid.Count)
-            .Select(pos => grid[pos.Y][pos.X])
-            .Where(cell =>
-                cell.Elevation - 1 <= CellAtPosition(currentPosition).Elevation && cell.DistanceFromOrigin is null)
-            .ToList();
-        
-        Console.WriteLine($"Legal cells: {string.Join(",", legalCells)}");
-
-        foreach (GridCell legalCell in legalCells)
+        if (maxDistanceCells.Count == 0)
         {
-            legalCell.DistanceFromOrigin = currentDistance + 1;
+            Console.WriteLine("STUCK! EXIT EARLY");
+            return -1;
         }
+
+        foreach (Position position in maxDistanceCells)
+        {
+            start = position;
+
+            List<GridCell> legalCells = new List<Position>
+                {
+                    start + Position.Down,
+                    start + Position.Right,
+                    start + Position.Up,
+                    start + Position.Left,
+                }
+                .Where(pos => pos.X >= 0 && pos.Y >= 0 && pos.X < grid[0].Count && pos.Y < grid.Count)
+                .Select(pos => grid[pos.Y][pos.X])
+                .Where(cell =>
+                    cell.Elevation - 1 <= CellAtPosition(start).Elevation && cell.DistanceFromOrigin is null)
+                .ToList();
+
+            // Console.WriteLine($"Legal cells: {string.Join(",", legalCells)}");
+
+            foreach (GridCell legalCell in legalCells)
+            {
+                legalCell.DistanceFromOrigin = distanceToSummit + 1;
+            }
+
+        }
+
+        // PrintGrid(mountain, currentPosition, summit);
+        // Console.WriteLine();
+        // Thread.Sleep(500);
+
+        distanceToSummit++;
     }
 
-    // PrintGrid(grid, currentPosition, summit);
-    // Console.WriteLine();
-    // Thread.Sleep(500);
-    currentDistance++;
+    // PrintGrid(grid, start, destination);
+    return distanceToSummit;
 }
 
-PrintGrid(grid, currentPosition, summit);
-Console.WriteLine($"Steps taken: {grid[summit.Y][summit.X].DistanceFromOrigin}");
+Console.WriteLine($"Part 1");
+int distanceFromSToE = DistanceToSummit(startingPoint, summit);
+Console.WriteLine($"Part 1: {distanceFromSToE}");
 
-void SetDistanceFromOriginAtPosition(Position position, int distanceFromOrigin)
-{
-    grid[position.Y][position.X].DistanceFromOrigin = distanceFromOrigin;
-}
+//Part 2
 
+//1. Get all positions of 'a' character in grid
+//2. Feed them into a loop calculating distance
+//3. Select the lowest number
+
+Console.WriteLine($"Part 2");
+List<Position> positions = GetPositionsOf('a');
+List<int> distancesToSummit = positions.Select(position => DistanceToSummit(position, summit)).ToList();
+
+Console.WriteLine($"Part 2: {distancesToSummit.Where(distance => distance > 0).Min()}");
 
 void PrintGrid(List<List<GridCell>> grid, Position you, Position top)
 {
@@ -125,10 +146,6 @@ void PrintGrid(List<List<GridCell>> grid, Position you, Position top)
             else if (position.Equals(top))
             {
                 Write(@"{=Magenta}${/} "); //({HeightOf(letter)})
-            }
-            else if (visited.Contains(position))
-            {
-                Write(@"{=Green}" + letter + "{/} "); //({HeightOf(letter)})}
             }
             else
             {
