@@ -24,49 +24,81 @@ fs.readFile('./input', (error, data) => {
     console.log(`== Pair ${pairIndex} ==`);
     console.log(`Compare ${JSON.stringify(left)}\n     vs ${JSON.stringify(right)}\nSTART`);
     const isCorrect = isInCorrectOrder(left, right);
-    if (isCorrect) runningSum += pairIndex;
-
+    if (isCorrect > 0) runningSum += pairIndex;
     console.log(`\n[Pair ${pairIndex}] Is in correct order?`, isCorrect, "Answer:", runningSum);
-
-    function isInCorrectOrder(left, right) {
-      for (let i = 0; i < left.length; i++) {
-        console.log(`Compare ${JSON.stringify(left[i])} vs ${JSON.stringify(right[i])}`);
-
-        if (right[i] == undefined) {
-          console.log(`Right side ran out of items, so WRONG`);
-          return false;
-        }
-
-        if (typeof left[i] === 'number' && typeof right[i] == 'number') {
-          if (left[i] > right[i]) {
-            console.log(`Right side is smaller, so WRONG`);
-            return false;
-          }
-
-          if (left[i] < right[i]) {
-            console.log(`Left side is smaller, so RIGHT`);
-            return true;
-          }
-        }
-        if (left[i] instanceof Array && right[i] instanceof Array) {
-          if (!isInCorrectOrder(left[i], right[i])) return false;
-        }
-        if (typeof left[i] == 'number' && right[i] instanceof Array) {
-          console.log(`Mixed types; convert left to [${left[i]}] and retry comparison`);
-          if (!isInCorrectOrder([left[i]], right[i])) return false;
-        }
-        if (left[i] instanceof Array && typeof right[i] == 'number') {
-          console.log(`Mixed types; convert right to [${right[i]}] and retry comparison`);
-          if (!isInCorrectOrder(left[i], [right[i]])) return false;
-        }
-      }
-
-      console.log(`Left side ran out of items, so RIGHT`);
-      return true;
-    }
 
     pairIndex++;
     console.log("")
   }
-
 });
+
+function isInCorrectOrder(left, right) {
+  for (let i = 0; i < left.length; i++) {
+    console.log(`Compare ${JSON.stringify(left[i])} vs ${JSON.stringify(right[i])}`);
+
+    if (right[i] == undefined) {
+      console.log(`Right side ran out of items, so WRONG`);
+      return -1;
+    }
+
+    if (typeof left[i] === 'number' && typeof right[i] == 'number') {
+      if (left[i] < right[i]) {
+        console.log(`Left side is smaller, so RIGHT`);
+        return 1;
+      }
+      if (left[i] > right[i]) {
+        console.log(`Right side is smaller, so WRONG`);
+        return -1;
+      }
+      continue;
+    }
+    if (left[i] instanceof Array && right[i] instanceof Array) {
+      const result = isInCorrectOrder(left[i], right[i]);
+      if (result > 0) {
+        console.log(`Propogating TRUE answer up`);
+        return 1;
+      }
+      if (result < 0) {
+        console.log(`Propogating FALSE answer up`);
+        return -1;
+      }
+      console.log(`Continuing...`);
+    }
+    if (typeof left[i] == 'number' && right[i] instanceof Array) {
+      console.log(`Mixed types; convert left to [${left[i]}] and retry comparison`);
+      const result = isInCorrectOrder([left[i]], right[i]);
+      if (result > 0) {
+        console.log(`Propogating TRUE answer up`);
+        return 1;
+      }
+      if (result < 0) {
+        console.log(`Propogating FALSE answer up`);
+        return -1;
+      }
+      console.log(`Continuing...`);
+    }
+    if (left[i] instanceof Array && typeof right[i] == 'number') {
+      console.log(`Mixed types; convert right to [${right[i]}] and retry comparison`);
+      const result = isInCorrectOrder(left[i], [right[i]]);
+      if (result > 0) {
+        console.log(`Propogating TRUE answer up`);
+        return 1;
+      }
+      if (result < 0) {
+        console.log(`Propogating FALSE answer up`);
+        return -1;
+      }
+      console.log(`Continuing...`);
+    }
+  }
+
+  if (left.length == right.length) {
+    console.log(`Left and right are same size, so CONTINUE`);
+    return 0;
+  }
+
+  if (left.length < right.length) {
+    console.log(`Left side ran out of items, so RIGHT`);
+    return 1;
+  }
+}
