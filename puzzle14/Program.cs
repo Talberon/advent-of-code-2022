@@ -18,7 +18,7 @@
 
 // Potential Gotcha: What about a pinched position? Seems like it should still go down/left even if left and down are blocked as long as there's a diagonal available
 
-string[] lines = File.ReadAllLines("test_input");
+string[] lines = File.ReadAllLines("input");
 
 List<List<Position>> wallDirections = lines.Select(line => line.Split(" -> ")
         .Select(Position.FromString)
@@ -33,12 +33,64 @@ const int top = 0;
 Console.WriteLine($"Top: {top} | Right Side: {rightSide} | Bottom: {bottom} | Left: {leftSide}");
 
 var sandOrigin = new Position(500, 0);
-IGridItem[,] grid = BuildGrid(bottom, rightSide, wallDirections);
+IGridItem?[,] grid = BuildGrid(bottom, rightSide, wallDirections);
 PrintGrid(grid, leftSide);
+int sandUnits = CountSand(grid, sandOrigin, leftSide);
 
-static IGridItem[,] BuildGrid(int bottom, int rightSide, List<List<Position>> instructions)
+PrintGrid(grid, leftSide);
+Console.WriteLine($"Part 1: {sandUnits}");
+
+static int CountSand(IGridItem?[,] grid, Position sandSpawn, int leftSide)
 {
-    var gridItems = new IGridItem[rightSide + 1, bottom + 1];
+    //Add sand to grid
+    Sand? fallingSand = null;
+    foreach (IGridItem? item in grid)
+    {
+        if (item is Sand gridSand)
+        {
+            fallingSand = gridSand;
+        }
+    }
+
+    if (fallingSand is null)
+    {
+        fallingSand = new Sand { Position = sandSpawn };
+        grid[sandSpawn.X, sandSpawn.Y] = fallingSand;
+    }
+
+    Sand currentSand = fallingSand.Value;
+
+    int sandGrainCount = 0;
+
+    while (true)
+    {
+        if (currentSand.NextLegalMove(grid) is not null)
+        {
+            grid[currentSand.Position.X, currentSand.Position.Y] = null;
+            currentSand.Position = currentSand.NextLegalMove(grid)!.Value;
+            grid[currentSand.Position.X, currentSand.Position.Y] = currentSand;
+        }
+        else
+        {
+            // PrintGrid(grid, leftSide);
+            // Console.WriteLine($"Grain Count: {sandGrainCount}\n");
+            
+            if (currentSand.Position.Y == grid.GetLength(1) - 1 ||
+                currentSand.Position.X >= grid.GetLength(0) ||
+                currentSand.Position.X < 0)
+            {
+                return sandGrainCount;
+            }
+
+            currentSand = new Sand { Position = sandSpawn };
+            sandGrainCount++;
+        }
+    }
+}
+
+static IGridItem?[,] BuildGrid(int bottom, int rightSide, List<List<Position>> instructions)
+{
+    var gridItems = new IGridItem?[rightSide + 2, bottom + 1];
 
     foreach (List<Position> wallList in instructions)
     {
@@ -46,7 +98,7 @@ static IGridItem[,] BuildGrid(int bottom, int rightSide, List<List<Position>> in
         {
             (int prevX, int prevY) = wallList[index - 1];
             (int currX, int currY) = wallList[index];
-            
+
             gridItems[prevX, prevY] = new Wall();
             gridItems[currX, currY] = new Wall();
 
@@ -80,17 +132,17 @@ static IGridItem[,] BuildGrid(int bottom, int rightSide, List<List<Position>> in
     return gridItems;
 }
 
-static void PrintGrid(IGridItem[,] grid, int leftSide)
+static void PrintGrid(IGridItem?[,] grid, int leftSide)
 {
     for (int row = 0; row < grid.GetLength(1); row++)
     {
-        for (int column = leftSide; column < grid.GetLength(0); column++)
+        for (int column = leftSide - 1; column < grid.GetLength(0); column++)
         {
             Console.Write(grid[column, row] switch
             {
                 Wall => "#",
                 Sand => "O",
-                _ => "."
+                _ => "|"
             });
         }
 
@@ -107,6 +159,22 @@ internal interface IGridItem
 internal struct Sand : IGridItem
 {
     public Position Position { get; set; }
+
+    public Position? NextLegalMove(IGridItem?[,] grid)
+    {
+        var below = Position + Position.Down;
+        var leftBelow = Position + Position.Down + Position.Left;
+        var rightBelow = Position + Position.Down + Position.Right;
+
+        if (below.Y >= grid.GetLength(1)) return null;
+        if (leftBelow.X < 0) return null;
+
+        if (grid[below.X, below.Y] is null) return below;
+        if (grid[leftBelow.X, leftBelow.Y] is null) return leftBelow;
+        if (grid[rightBelow.X, rightBelow.Y] is null) return rightBelow;
+
+        return null;
+    }
 }
 
 internal struct Wall : IGridItem
@@ -132,8 +200,8 @@ internal readonly struct Position
         y = Y;
     }
 
-    public static Position Up => new(0, 1);
-    public static Position Down => new(0, -1);
+    public static Position Up => new(0, -1);
+    public static Position Down => new(0, 1);
     public static Position Left => new(-1, 0);
     public static Position Right => new(1, 0);
 
