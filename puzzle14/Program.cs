@@ -26,7 +26,7 @@ List<List<Position>> wallDirections = lines.Select(line => line.Split(" -> ")
     .ToList();
 
 int rightSide = wallDirections.Max(positions => positions.Select(pos => pos.X).Max(x => x));
-int bottom = wallDirections.Max(positions => positions.Select(pos => pos.Y).Max(y => y));
+int bottom = wallDirections.Max(positions => positions.Select(pos => pos.Y).Max(y => y)) + 1;
 int leftSide = wallDirections.Min(positions => positions.Select(pos => pos.X).Min(x => x));
 const int top = 0;
 
@@ -34,10 +34,12 @@ Console.WriteLine($"Top: {top} | Right Side: {rightSide} | Bottom: {bottom} | Le
 
 var sandOrigin = new Position(500, 0);
 IGridItem?[,] grid = BuildGrid(bottom, rightSide, wallDirections);
-PrintGrid(grid, leftSide);
+Console.WriteLine("Start:");
+PrintGrid(grid, leftSide, bottom);
 int sandUnits = CountSand(grid, sandOrigin, leftSide);
 
-PrintGrid(grid, leftSide);
+Console.WriteLine("End:");
+PrintGrid(grid, leftSide, bottom);
 Console.WriteLine($"Part 1: {sandUnits}");
 
 static int CountSand(IGridItem?[,] grid, Position sandSpawn, int leftSide)
@@ -74,23 +76,21 @@ static int CountSand(IGridItem?[,] grid, Position sandSpawn, int leftSide)
         {
             // PrintGrid(grid, leftSide);
             // Console.WriteLine($"Grain Count: {sandGrainCount}\n");
-            
-            if (currentSand.Position.Y == grid.GetLength(1) - 1 ||
-                currentSand.Position.X >= grid.GetLength(0) ||
-                currentSand.Position.X < 0)
+
+            sandGrainCount++;
+            if (currentSand.Position == sandSpawn)
             {
                 return sandGrainCount;
             }
 
             currentSand = new Sand { Position = sandSpawn };
-            sandGrainCount++;
         }
     }
 }
 
 static IGridItem?[,] BuildGrid(int bottom, int rightSide, List<List<Position>> instructions)
 {
-    var gridItems = new IGridItem?[rightSide + 2, bottom + 1];
+    var gridItems = new IGridItem?[rightSide + bottom, bottom + 1];
 
     foreach (List<Position> wallList in instructions)
     {
@@ -132,11 +132,11 @@ static IGridItem?[,] BuildGrid(int bottom, int rightSide, List<List<Position>> i
     return gridItems;
 }
 
-static void PrintGrid(IGridItem?[,] grid, int leftSide)
+static void PrintGrid(IGridItem?[,] grid, int leftSide, int bottom)
 {
     for (int row = 0; row < grid.GetLength(1); row++)
     {
-        for (int column = leftSide - 1; column < grid.GetLength(0); column++)
+        for (int column = leftSide - bottom / 2; column < grid.GetLength(0); column++)
         {
             Console.Write(grid[column, row] switch
             {
@@ -167,7 +167,6 @@ internal struct Sand : IGridItem
         var rightBelow = Position + Position.Down + Position.Right;
 
         if (below.Y >= grid.GetLength(1)) return null;
-        if (leftBelow.X < 0) return null;
 
         if (grid[below.X, below.Y] is null) return below;
         if (grid[leftBelow.X, leftBelow.Y] is null) return leftBelow;
