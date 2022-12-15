@@ -20,27 +20,67 @@
 
 using System.Text.RegularExpressions;
 
-string[] lines = File.ReadAllLines("input");
+List<Instruction> instructions;
 
-List<Instruction> instructions = ParseInstructions(lines);
+// const int checkRow = 10;
+// const string fileName = "test_input";
 
-int top = instructions.Min(instruction => instruction.Top);
-int bottom = instructions.Max(instruction => instruction.Bottom);
-int leftSide = instructions.Min(instruction => instruction.Left);
-int rightSide = instructions.Max(instruction => instruction.Right);
+const int checkRow = 2_000_000;
+const string fileName = "input";
 
-var offset = new Position(Math.Min(leftSide, 0).Abs(), Math.Min(top, 0).Abs());
-var grid = new GridItem?[rightSide.Abs() + offset.X + 1, bottom.Abs() + offset.Y + 1];
+CountBeaconImpossibleAtRow(fileName, checkRow);
 
-AddItems(ref grid, offset, instructions);
-PrintGrid(grid, offset);
+static void CountBeaconImpossibleAtRow(string fileName, int row)
+{
+    string[] lines = File.ReadAllLines(fileName);
 
-Console.WriteLine("\nCheck signals...\n");
-List<Signal> signals = GetSignals(instructions);
-ScanBeacons(ref grid, offset, signals);
+    List<Instruction> instructions = ParseInstructions(lines);
 
-PrintGrid(grid, offset);
+    List<Position> beaconsAtRow = instructions.Select(i => i.Beacon.TruePosition).Where(p => p.Y == row).ToList();
+    
+    Console.WriteLine($"Beacons at row {row}: {beaconsAtRow.Count}");
 
+    List<Position> distinctPositions = instructions
+        .SelectMany(instruction => instruction.Sensor.PositionsInRadiusAtRow(row, beaconsAtRow))
+        .Distinct()
+        .ToList();
+
+    int impossiblePositions = distinctPositions.Count;
+
+    Console.WriteLine($"Part 1: {impossiblePositions}");
+}
+
+static List<Instruction> ParseInstructions(string[] lines) =>
+    (from line in lines
+        select Regex.Matches(line, @"((-|)\d+)")
+            .Select(match => Convert.ToInt32(match.Value))
+            .ToList()
+        into parsedCoordinates
+        let beacon = new Beacon { TruePosition = new Position(parsedCoordinates[2], parsedCoordinates[3]) }
+        let sensorPosition = new Position(parsedCoordinates[0], parsedCoordinates[1])
+        let sensor = new Sensor
+            { TruePosition = sensorPosition, Radius = sensorPosition.DistanceFrom(beacon.TruePosition) }
+        select new Instruction { Beacon = beacon, Sensor = sensor }).ToList();
+
+void NaiveSolution()
+{
+    int top = instructions.Min(instruction => instruction.Top);
+    int bottom = instructions.Max(instruction => instruction.Bottom);
+    int leftSide = instructions.Min(instruction => instruction.Left);
+    int rightSide = instructions.Max(instruction => instruction.Right);
+
+    var offset = new Position(Math.Min(leftSide, 0).Abs(), Math.Min(top, 0).Abs());
+    var grid = new GridItem?[rightSide.Abs() + offset.X + 1, bottom.Abs() + offset.Y + 1];
+
+    AddItems(ref grid, offset, instructions);
+    PrintGrid(grid, offset);
+
+    Console.WriteLine("\nCheck signals...\n");
+    List<Signal> signals = GetSignals(instructions);
+    ScanBeacons(ref grid, offset, signals);
+
+    PrintGrid(grid, offset);
+}
 
 static void ScanBeacons(ref GridItem?[,] grid, Position offset, List<Signal> signals)
 {
@@ -53,30 +93,6 @@ static void ScanBeacons(ref GridItem?[,] grid, Position offset, List<Signal> sig
         (int sigX, int sigY) = signal.GridPosition;
         grid[sigX, sigY] ??= signal;
     }
-}
-
-static List<Signal> GetSignals(List<Instruction> instructions)
-{
-    List<Signal> signals = new();
-
-    foreach (Instruction instruction in instructions)
-    {
-        int sensorRadius = instruction.Sensor.Radius;
-
-        for (int row = -sensorRadius; row <= sensorRadius; row++)
-        {
-            for (int col = -sensorRadius; col <= sensorRadius; col++)
-            {
-                Position signalPosition = instruction.Sensor.TruePosition + new Position(col, row);
-
-                if (row.Abs() + col.Abs() > sensorRadius) continue;
-
-                signals.Add(new Signal { TruePosition = signalPosition, GridIcon = sensorRadius.ToString() });
-            }
-        }
-    }
-
-    return signals;
 }
 
 static void AddItems(ref GridItem?[,] grid, Position offset, List<Instruction> instructions)
@@ -124,17 +140,66 @@ static void PrintGrid(GridItem?[,] grid, Position offset)
     }
 }
 
-static List<Instruction> ParseInstructions(string[] lines) =>
-    (from line in lines
-        select Regex.Matches(line, @"((-|)\d+)")
-            .Select(match => Convert.ToInt32(match.Value))
-            .ToList()
-        into parsedCoordinates
-        let beacon = new Beacon { TruePosition = new Position(parsedCoordinates[2], parsedCoordinates[3]) }
-        let sensorPosition = new Position(parsedCoordinates[0], parsedCoordinates[1])
-        let sensor = new Sensor
-            { TruePosition = sensorPosition, Radius = sensorPosition.DistanceFrom(beacon.TruePosition) }
-        select new Instruction { Beacon = beacon, Sensor = sensor }).ToList();
+
+static List<Signal> GetSignals(List<Instruction> instructions) => instructions
+    // .Where(instruction => instruction.Sensor.TruePosition == new Position(8, 7))
+    .SelectMany(instruction => instruction.Sensor
+        .PositionsInRadius()
+        .Select(pos => new Signal
+            {
+                TruePosition = pos,
+                GridIcon = pos.DistanceFrom(instruction.Sensor.TruePosition).ToString()
+            }
+        )
+    ).ToList();
+
+//Signal Origin
+class Sensor : GridItem
+{
+    public int Radius { get; init; }
+
+    public List<Position> PositionsInRadiusAtRow(int atRow, List<Position> shouldIgnore)
+    {
+        List<Position> signals = new();
+
+        int lowerY = TruePosition.Y - Radius;
+        int upperY = TruePosition.Y + Radius + 1;
+
+        if (atRow < lowerY || atRow > upperY) return signals;
+
+        for (int row = -Radius; row <= Radius; row++)
+        {
+            if (row != atRow - TruePosition.Y) continue;
+
+            for (int col = -Radius; col <= Radius; col++)
+            {
+                if (row.Abs() + col.Abs() > Radius) continue;
+                
+                if (shouldIgnore.Any(ignore => ignore.X == TruePosition.X + col)) continue;
+                
+                signals.Add(TruePosition + new Position(col, row));
+            }
+        }
+
+        return signals;
+    }
+
+    public List<Position> PositionsInRadius()
+    {
+        List<Position> signals = new();
+
+        for (int row = -Radius; row <= Radius; row++)
+        {
+            for (int col = -Radius; col <= Radius; col++)
+            {
+                if (row.Abs() + col.Abs() > Radius) continue;
+                signals.Add(TruePosition + new Position(col, row));
+            }
+        }
+
+        return signals;
+    }
+}
 
 internal readonly struct Instruction
 {
@@ -161,11 +226,6 @@ abstract class GridItem
     public Position GridPosition => TruePosition + Offset;
 }
 
-//Signal Origin
-class Sensor : GridItem
-{
-    public int Radius { get; init; }
-}
 
 //Signal Destination
 class Beacon : GridItem
@@ -216,7 +276,6 @@ internal readonly struct Position
 
     public int DistanceFrom(Position other)
     {
-
         int vertDistance = Math.Max(Y, other.Y) - Math.Min(Y, other.Y);
         int horiDistance = Math.Max(X, other.X) - Math.Min(X, other.X);
 
