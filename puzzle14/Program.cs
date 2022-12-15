@@ -33,25 +33,30 @@ const int top = 0;
 Console.WriteLine($"Top: {top} | Right Side: {rightSide} | Bottom: {bottom} | Left: {leftSide}");
 
 var sandOrigin = new Position(500, 0);
+
 IGridItem?[,] grid = BuildGrid(bottom, rightSide, wallDirections);
 Console.WriteLine("Start:");
 PrintGrid(grid, leftSide, bottom);
-int sandUnits = CountSand(grid, sandOrigin, leftSide);
-
+int abyssGrains = CountBeforeAbyss(grid, sandOrigin);
 Console.WriteLine("End:");
 PrintGrid(grid, leftSide, bottom);
-Console.WriteLine($"Part 1: {sandUnits}");
+Console.WriteLine($"Part 1: {abyssGrains}");
 
-static int CountSand(IGridItem?[,] grid, Position sandSpawn, int leftSide)
+
+IGridItem?[,] grid2 = BuildGrid(bottom, rightSide, wallDirections);
+Console.WriteLine("Start:");
+PrintGrid(grid2, leftSide, bottom);
+int clogGrains = CountSandClog(grid2, sandOrigin);
+Console.WriteLine("End:");
+PrintGrid(grid2, leftSide, bottom);
+Console.WriteLine($"Part 2: {clogGrains}");
+
+static int CountBeforeAbyss(IGridItem?[,] grid, Position sandSpawn)
 {
-    //Add sand to grid
     Sand? fallingSand = null;
     foreach (IGridItem? item in grid)
     {
-        if (item is Sand gridSand)
-        {
-            fallingSand = gridSand;
-        }
+        if (item is Sand gridSand) fallingSand = gridSand;
     }
 
     if (fallingSand is null)
@@ -61,22 +66,58 @@ static int CountSand(IGridItem?[,] grid, Position sandSpawn, int leftSide)
     }
 
     Sand currentSand = fallingSand.Value;
-
     int sandGrainCount = 0;
 
     while (true)
     {
-        if (currentSand.NextLegalMove(grid) is not null)
+        if (NextLegalMove(currentSand, grid) is not null)
         {
             grid[currentSand.Position.X, currentSand.Position.Y] = null;
-            currentSand.Position = currentSand.NextLegalMove(grid)!.Value;
+            currentSand.Position = NextLegalMove(currentSand, grid)!.Value;
             grid[currentSand.Position.X, currentSand.Position.Y] = currentSand;
         }
         else
         {
-            // PrintGrid(grid, leftSide);
-            // Console.WriteLine($"Grain Count: {sandGrainCount}\n");
+            if (currentSand.Position.Y == grid.GetLength(1) - 1 ||
+                currentSand.Position.X >= grid.GetLength(0) ||
+                currentSand.Position.X < 0)
+            {
+                return sandGrainCount;
+            }
 
+            currentSand = new Sand { Position = sandSpawn };
+            sandGrainCount++;
+        }
+    }
+}
+
+static int CountSandClog(IGridItem?[,] grid, Position sandSpawn)
+{
+    Sand? fallingSand = null;
+    foreach (IGridItem? item in grid)
+    {
+        if (item is Sand gridSand) fallingSand = gridSand;
+    }
+
+    if (fallingSand is null)
+    {
+        fallingSand = new Sand { Position = sandSpawn };
+        grid[sandSpawn.X, sandSpawn.Y] = fallingSand;
+    }
+
+    Sand currentSand = fallingSand.Value;
+    int sandGrainCount = 0;
+
+    while (true)
+    {
+        if (NextLegalMove(currentSand, grid) is not null)
+        {
+            grid[currentSand.Position.X, currentSand.Position.Y] = null;
+            currentSand.Position = NextLegalMove(currentSand, grid)!.Value;
+            grid[currentSand.Position.X, currentSand.Position.Y] = currentSand;
+        }
+        else
+        {
             sandGrainCount++;
             if (currentSand.Position == sandSpawn)
             {
@@ -86,6 +127,21 @@ static int CountSand(IGridItem?[,] grid, Position sandSpawn, int leftSide)
             currentSand = new Sand { Position = sandSpawn };
         }
     }
+}
+
+static Position? NextLegalMove(Sand sand, IGridItem?[,] grid)
+{
+    var below = sand.Position + Position.Down;
+    var leftBelow = sand.Position + Position.Down + Position.Left;
+    var rightBelow = sand.Position + Position.Down + Position.Right;
+
+    if (below.Y >= grid.GetLength(1)) return null;
+
+    if (grid[below.X, below.Y] is null) return below;
+    if (grid[leftBelow.X, leftBelow.Y] is null) return leftBelow;
+    if (grid[rightBelow.X, rightBelow.Y] is null) return rightBelow;
+
+    return null;
 }
 
 static IGridItem?[,] BuildGrid(int bottom, int rightSide, List<List<Position>> instructions)
@@ -159,21 +215,6 @@ internal interface IGridItem
 internal struct Sand : IGridItem
 {
     public Position Position { get; set; }
-
-    public Position? NextLegalMove(IGridItem?[,] grid)
-    {
-        var below = Position + Position.Down;
-        var leftBelow = Position + Position.Down + Position.Left;
-        var rightBelow = Position + Position.Down + Position.Right;
-
-        if (below.Y >= grid.GetLength(1)) return null;
-
-        if (grid[below.X, below.Y] is null) return below;
-        if (grid[leftBelow.X, leftBelow.Y] is null) return leftBelow;
-        if (grid[rightBelow.X, rightBelow.Y] is null) return rightBelow;
-
-        return null;
-    }
 }
 
 internal struct Wall : IGridItem
