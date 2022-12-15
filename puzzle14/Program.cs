@@ -1,22 +1,11 @@
 ﻿// Day 14: Regolith Reservoir
 
-// Grid
+// Grid Orientation:
 //      X
 //   0 1 2 3
 // Y 1
 //   2
 //   3
-
-// Sand pours in from (X:500, Y:0)
-
-// Sand is produced one unit at a time (until one comes to rest)
-// Fall Priority:
-// 1) Fall down 1 if possible
-// 2) Fall down 1 and to the LEFT (-X) if possible
-// 3) Fall down 1 and to the RIGHT (+X) if possible
-// 4) Else, COME TO REST, start dropping next grain of sand
-
-// Potential Gotcha: What about a pinched position? Seems like it should still go down/left even if left and down are blocked as long as there's a diagonal available
 
 string[] lines = File.ReadAllLines("input");
 
@@ -28,33 +17,23 @@ List<List<Position>> wallDirections = lines.Select(line => line.Split(" -> ")
 int rightSide = wallDirections.Max(positions => positions.Select(pos => pos.X).Max(x => x));
 int bottom = wallDirections.Max(positions => positions.Select(pos => pos.Y).Max(y => y)) + 1;
 int leftSide = wallDirections.Min(positions => positions.Select(pos => pos.X).Min(x => x));
-const int top = 0;
-
-Console.WriteLine($"Top: {top} | Right Side: {rightSide} | Bottom: {bottom} | Left: {leftSide}");
 
 var sandOrigin = new Position(500, 0);
 
-IGridItem?[,] grid = BuildGrid(bottom, rightSide, wallDirections);
-Console.WriteLine("Start:");
-PrintGrid(grid, leftSide, bottom);
-int abyssGrains = CountBeforeAbyss(grid, sandOrigin);
-Console.WriteLine("End:");
-PrintGrid(grid, leftSide, bottom);
+GridItem?[,] grid1 = BuildGrid(bottom, rightSide, wallDirections);
+int abyssGrains = CountSand(grid1, sandOrigin, true);
+PrintGrid(grid1, leftSide, bottom);
 Console.WriteLine($"Part 1: {abyssGrains}");
 
-
-IGridItem?[,] grid2 = BuildGrid(bottom, rightSide, wallDirections);
-Console.WriteLine("Start:");
-PrintGrid(grid2, leftSide, bottom);
-int clogGrains = CountSandClog(grid2, sandOrigin);
-Console.WriteLine("End:");
+GridItem?[,] grid2 = BuildGrid(bottom, rightSide, wallDirections);
+int clogGrains = CountSand(grid2, sandOrigin, false);
 PrintGrid(grid2, leftSide, bottom);
 Console.WriteLine($"Part 2: {clogGrains}");
 
-static int CountBeforeAbyss(IGridItem?[,] grid, Position sandSpawn)
+static int CountSand(GridItem?[,] grid, Position sandSpawn, bool stopCountingIfSpill)
 {
     Sand? fallingSand = null;
-    foreach (IGridItem? item in grid)
+    foreach (GridItem? item in grid)
     {
         if (item is Sand gridSand) fallingSand = gridSand;
     }
@@ -65,7 +44,7 @@ static int CountBeforeAbyss(IGridItem?[,] grid, Position sandSpawn)
         grid[sandSpawn.X, sandSpawn.Y] = fallingSand;
     }
 
-    Sand currentSand = fallingSand.Value;
+    Sand currentSand = fallingSand;
     int sandGrainCount = 0;
 
     while (true)
@@ -75,61 +54,32 @@ static int CountBeforeAbyss(IGridItem?[,] grid, Position sandSpawn)
             grid[currentSand.Position.X, currentSand.Position.Y] = null;
             currentSand.Position = NextLegalMove(currentSand, grid)!.Value;
             grid[currentSand.Position.X, currentSand.Position.Y] = currentSand;
+            continue;
         }
-        else
+
+        if (stopCountingIfSpill)
         {
-            if (currentSand.Position.Y == grid.GetLength(1) - 1 ||
-                currentSand.Position.X >= grid.GetLength(0) ||
-                currentSand.Position.X < 0)
+            bool grainReachesBottomOfGrid = currentSand.Position.Y == grid.GetLength(1) - 1;
+            if (grainReachesBottomOfGrid)
             {
                 return sandGrainCount;
             }
-
-            currentSand = new Sand { Position = sandSpawn };
-            sandGrainCount++;
-        }
-    }
-}
-
-static int CountSandClog(IGridItem?[,] grid, Position sandSpawn)
-{
-    Sand? fallingSand = null;
-    foreach (IGridItem? item in grid)
-    {
-        if (item is Sand gridSand) fallingSand = gridSand;
-    }
-
-    if (fallingSand is null)
-    {
-        fallingSand = new Sand { Position = sandSpawn };
-        grid[sandSpawn.X, sandSpawn.Y] = fallingSand;
-    }
-
-    Sand currentSand = fallingSand.Value;
-    int sandGrainCount = 0;
-
-    while (true)
-    {
-        if (NextLegalMove(currentSand, grid) is not null)
-        {
-            grid[currentSand.Position.X, currentSand.Position.Y] = null;
-            currentSand.Position = NextLegalMove(currentSand, grid)!.Value;
-            grid[currentSand.Position.X, currentSand.Position.Y] = currentSand;
         }
         else
         {
-            sandGrainCount++;
-            if (currentSand.Position == sandSpawn)
+            bool sandPileReachedSpout = currentSand.Position == sandSpawn;
+            if (sandPileReachedSpout)
             {
-                return sandGrainCount;
+                return sandGrainCount + 1;
             }
-
-            currentSand = new Sand { Position = sandSpawn };
         }
+
+        currentSand = new Sand { Position = sandSpawn };
+        sandGrainCount++;
     }
 }
 
-static Position? NextLegalMove(Sand sand, IGridItem?[,] grid)
+static Position? NextLegalMove(Sand sand, GridItem?[,] grid)
 {
     var below = sand.Position + Position.Down;
     var leftBelow = sand.Position + Position.Down + Position.Left;
@@ -144,9 +94,11 @@ static Position? NextLegalMove(Sand sand, IGridItem?[,] grid)
     return null;
 }
 
-static IGridItem?[,] BuildGrid(int bottom, int rightSide, List<List<Position>> instructions)
+static GridItem?[,] BuildGrid(int bottom, int rightSide, List<List<Position>> instructions)
 {
-    var gridItems = new IGridItem?[rightSide + bottom, bottom + 1];
+    const int spillBuffer = 1;
+    //Make grid taller for floor/wider for spillover
+    var gridItems = new GridItem?[rightSide + bottom, bottom + spillBuffer];
 
     foreach (List<Position> wallList in instructions)
     {
@@ -158,29 +110,23 @@ static IGridItem?[,] BuildGrid(int bottom, int rightSide, List<List<Position>> i
             gridItems[prevX, prevY] = new Wall();
             gridItems[currX, currY] = new Wall();
 
-            if (prevY == currY) //Same row
+            if (prevY == currY)
             {
                 int lower = Math.Min(currX, prevX);
                 int higher = Math.Max(currX, prevX);
-                //Run Horizontal
-                for (int col = lower; col < higher; col++)
-                {
-                    gridItems[col, currY] = new Wall();
-                }
+
+                for (int col = lower; col < higher; col++) gridItems[col, currY] = new Wall();
             }
-            else if (prevX == currX) //Same column
+            else if (prevX == currX)
             {
                 int lower = Math.Min(currY, prevY);
                 int higher = Math.Max(currY, prevY);
-                //Run Vertical
-                for (int row = lower; row < higher; row++)
-                {
-                    gridItems[currX, row] = new Wall();
-                }
+
+                for (int row = lower; row < higher; row++) gridItems[currX, row] = new Wall();
             }
             else
             {
-                throw new Exception("Previous and current walls should not be the same point");
+                throw new Exception("Esta no bueno, hombre.");
             }
         }
     }
@@ -188,11 +134,11 @@ static IGridItem?[,] BuildGrid(int bottom, int rightSide, List<List<Position>> i
     return gridItems;
 }
 
-static void PrintGrid(IGridItem?[,] grid, int leftSide, int bottom)
+static void PrintGrid(GridItem?[,] grid, int leftSide, int bottom)
 {
     for (int row = 0; row < grid.GetLength(1); row++)
     {
-        for (int column = leftSide - bottom / 2; column < grid.GetLength(0); column++)
+        for (int column = leftSide - bottom; column < grid.GetLength(0); column++)
         {
             Console.Write(grid[column, row] switch
             {
@@ -207,21 +153,18 @@ static void PrintGrid(IGridItem?[,] grid, int leftSide, int bottom)
 }
 
 
-internal interface IGridItem
+internal abstract class GridItem
 {
     public Position Position { get; set; }
 }
 
-internal struct Sand : IGridItem
+internal class Sand : GridItem
 {
-    public Position Position { get; set; }
 }
 
-internal struct Wall : IGridItem
+internal class Wall : GridItem
 {
-    public Position Position { get; set; }
 }
-
 
 internal readonly struct Position
 {
