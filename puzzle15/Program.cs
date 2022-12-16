@@ -18,37 +18,97 @@
 //    Y 2
 //      3
 
+using System.ComponentModel.Design;
 using System.Text.RegularExpressions;
 
-List<Instruction> instructions;
+const int frequencyMultiplier = 4_000_000;
 
-// const int checkRow = 10;
-// const string fileName = "test_input";
 
-const int checkRow = 2_000_000;
-const string fileName = "input";
+const int checkRow = 10;
+const string fileName = "test_input";
+const int searchSpaceLimit = 20;
 
-CountBeaconImpossibleAtRow(fileName, checkRow);
+// const int checkRow = 2_000_000;
+// const string fileName = "input";
+// const int searchSpaceLimit = 4_000_000;
 
-static void CountBeaconImpossibleAtRow(string fileName, int row)
+string[] lines = File.ReadAllLines(fileName);
+
+List<Instruction> instructions = ParseInstructions(lines);
+
+int impossiblePositions = OccupiedPositionsInRow(instructions, checkRow).Count();
+Console.WriteLine($"Part 1: {impossiblePositions}");
+
+DetectTuningFrequency(instructions, searchSpaceLimit, frequencyMultiplier);
+
+return;
+
+//Methods
+
+static void DetectTuningFrequency(List<Instruction> instructions, int searchSpaceLimit, int frequencyMultiplier)
 {
-    string[] lines = File.ReadAllLines(fileName);
+    Simulate(instructions);
 
-    List<Instruction> instructions = ParseInstructions(lines);
+    // (X,Y) of missing beacon must be between (0,0) and (searchSpaceLimit,searchSpaceLimit)
+    Position undetectedBeacon = Position.Zero;
+    int previousCount = 0;
+    bool lostBeaconFound = false;
 
-    List<Position> beaconsAtRow = instructions.Select(i => i.Beacon.TruePosition).Where(p => p.Y == row).ToList();
-    
-    Console.WriteLine($"Beacons at row {row}: {beaconsAtRow.Count}");
+    long was = DateTimeOffset.Now.ToUnixTimeMilliseconds();
 
-    List<Position> distinctPositions = instructions
-        .SelectMany(instruction => instruction.Sensor.PositionsInRadiusAtRow(row, beaconsAtRow))
-        .Distinct()
+    for (int row = 0; row <= searchSpaceLimit; row++)
+    {
+        IEnumerable<Position> knownBeaconsInRow =
+            instructions.Select(i => i.Beacon.TruePosition).Where(p => p.Y == row);
+        // Console.WriteLine($"Known beacons in row {knownBeaconsInRow.Count()}");
+
+        RangeCollection occupiedRange = instructions
+            .Where(instructions => instructions.Sensor.TruePosition.Y - instructions.Sensor.Radius <= row &&
+                                   instructions.Sensor.TruePosition.Y + instructions.Sensor.Radius >= row
+            )
+            .Aggregate(new RangeCollection(),
+                (total, instruction) => instruction.Sensor.RangeTakenAtRow(row, searchSpaceLimit) is { } range
+                    ? total.AddRange(range)
+                    : total);
+
+        int nextCount = occupiedRange.Ranges.Count;
+
+        long now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
+        Console.WriteLine(
+            $"[{now - was}ms] Occupied Ranges: \n\tY: {row}\tX: {string.Join($"\n\tY: {row}\tX: ", occupiedRange.Ranges)}");
+        was = now;
+
+        if (nextCount > 1)
+        {
+            Console.WriteLine($"[Y: {row}] FOUND SPLIT! {nextCount}");
+            //TODO Find beacon
+        }
+
+        Console.WriteLine($"No beacon found on row: {row} | PrevCount: {previousCount} vs NextCount: {nextCount}");
+        previousCount = nextCount;
+    }
+
+
+    int tuningFrequency = (undetectedBeacon.X * frequencyMultiplier) + undetectedBeacon.Y;
+    Console.WriteLine(
+        $"Part 2: {undetectedBeacon.X} x {frequencyMultiplier} + {undetectedBeacon.Y} = <{tuningFrequency}>");
+}
+
+static IEnumerable<Position> OccupiedPositionsInRow(List<Instruction> instructions, int row)
+{
+    List<Position> knownBeaconsInRow = instructions.Select(i => i.Beacon.TruePosition)
+        .Where(p => p.Y == row)
         .ToList();
 
-    int impossiblePositions = distinctPositions.Count;
-
-    Console.WriteLine($"Part 1: {impossiblePositions}");
+    return instructions
+        .Where(instructions => instructions.Sensor.TruePosition.Y - instructions.Sensor.Radius <= row &&
+                               instructions.Sensor.TruePosition.Y + instructions.Sensor.Radius >= row
+        )
+        .SelectMany(instruction => instruction.Sensor.PositionsInRadiusAtRow(row, knownBeaconsInRow))
+        .Except(knownBeaconsInRow)
+        .Distinct();
 }
+
 
 static List<Instruction> ParseInstructions(string[] lines) =>
     (from line in lines
@@ -62,7 +122,7 @@ static List<Instruction> ParseInstructions(string[] lines) =>
             { TruePosition = sensorPosition, Radius = sensorPosition.DistanceFrom(beacon.TruePosition) }
         select new Instruction { Beacon = beacon, Sensor = sensor }).ToList();
 
-void NaiveSolution()
+static void Simulate(List<Instruction> instructions)
 {
     int top = instructions.Min(instruction => instruction.Top);
     int bottom = instructions.Max(instruction => instruction.Bottom);
@@ -128,7 +188,7 @@ static void PrintGrid(GridItem?[,] grid, Position offset)
             {
                 Sensor => "S",
                 Beacon => "B",
-                Signal sig => sig.GridIcon,
+                Signal sig => "#", //sig.GridIcon,
                 _ => "."
             };
 
@@ -174,14 +234,26 @@ class Sensor : GridItem
             for (int col = -Radius; col <= Radius; col++)
             {
                 if (row.Abs() + col.Abs() > Radius) continue;
-                
+
                 if (shouldIgnore.Any(ignore => ignore.X == TruePosition.X + col)) continue;
-                
+
                 signals.Add(TruePosition + new Position(col, row));
             }
         }
 
         return signals;
+    }
+
+    public Range? RangeTakenAtRow(int row, int rightSideLimit)
+    {
+        int originDistanceFromRow = (row - TruePosition.Y).Abs();
+
+        if (originDistanceFromRow > Radius) return null;
+
+        int left = TruePosition.X - (Radius - originDistanceFromRow);
+        int right = TruePosition.X + (Radius - originDistanceFromRow);
+
+        return new Range(Math.Max(0, left), Math.Min(rightSideLimit, right));
     }
 
     public List<Position> PositionsInRadius()
@@ -199,6 +271,113 @@ class Sensor : GridItem
 
         return signals;
     }
+}
+
+internal readonly struct RangeCollection
+{
+    public List<Range> Ranges { get; }
+
+    public RangeCollection()
+    {
+        Ranges = new();
+    }
+
+    public RangeCollection AddRange(Range newRange)
+    {
+        // Console.WriteLine($"Adding range: {newRange} to ({string.Join(",", Ranges)})");
+        if (Ranges.FindIndex(range => range.CanAdd(newRange)) is var index and >= 0)
+        {
+            // Console.WriteLine($"\t{newRange} DOES fit into ({string.Join(",", Ranges)})!");
+            Ranges[index] += newRange;
+        }
+        else
+        {
+            // Console.WriteLine($"\t{newRange} does NOT fit into ({string.Join(",", Ranges)}), so add it.");
+            Ranges.Add(newRange);
+        }
+
+        CombineRanges();
+
+        // Console.WriteLine($"After adding range: ({string.Join(",", Ranges)})");
+
+        return this;
+    }
+
+    private void CombineRanges()
+    {
+        for (int i = 0; i < Ranges.Count; i++)
+        {
+            Range current = Ranges[i];
+            while (Ranges.FindIndex(r => r != current && r.CanAdd(current)) is var canAddIndex and >= 0)
+            {
+                Ranges[i] += Ranges[canAddIndex];
+                // Console.WriteLine($"Combining ranges: {Ranges[i]} + {Ranges[canAddIndex]} = {Ranges[i] + Ranges[canAddIndex]}");
+                Ranges.RemoveAt(canAddIndex);
+            }
+        }
+    }
+}
+
+internal readonly struct Range
+{
+    public static Range Zero => new(0, 0);
+
+    public int Start { get; }
+    public int End { get; }
+
+    public Range(int start, int end)
+    {
+        if (end < start)
+        {
+            throw new Exception($"End cannot be lower than start! S: {start}, E: {end}");
+        }
+
+        Start = start;
+        End = end;
+    }
+
+    public int Length => End - Start;
+
+    public static bool operator ==(Range a, Range b) => a.Equals(b);
+    public static bool operator !=(Range a, Range b) => !a.Equals(b);
+
+    public static Range operator +(Range a, Range b)
+    {
+        if (!a.CanAdd(b))
+        {
+            throw new Exception($"Ranges do not overlap! ({a}) vs ({b})");
+        }
+
+        return new Range(Math.Min(a.Start, b.Start), Math.Max(a.End, b.End));
+    }
+
+    public bool CanAdd(Range other)
+    {
+        bool otherIsEntirelyWithinMe = other.Start >= Start && other.End <= End;
+        bool iAmEntirelyWithinOther = Start >= other.Start && End <= other.End;
+        bool iPartiallOverlapWithOther =
+            Start >= other.Start && Start <= other.End || End <= other.End && End >= other.Start;
+        bool otherPartiallyOverlapsWithMe =
+            other.Start >= Start && other.Start <= End || other.End <= End && other.End >= Start;
+
+        bool areAdjacent = other.End == Start - 1 || other.Start == End + 1 ||
+                           End == other.Start - 1 || Start == other.End + 1;
+
+        return otherIsEntirelyWithinMe || iAmEntirelyWithinOther || iPartiallOverlapWithOther ||
+               otherPartiallyOverlapsWithMe || areAdjacent;
+    }
+
+    public bool Equals(Range other)
+    {
+        return Start == other.Start && End == other.End;
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(Start, End);
+    }
+
+    public override string ToString() => $"<Start: {Start}, End: {End}>";
 }
 
 internal readonly struct Instruction
