@@ -18,19 +18,18 @@
 //    Y 2
 //      3
 
-using System.ComponentModel.Design;
 using System.Text.RegularExpressions;
 
 const int frequencyMultiplier = 4_000_000;
 
 
-const int checkRow = 10;
-const string fileName = "test_input";
-const int searchSpaceLimit = 20;
+// const int checkRow = 10;
+// const string fileName = "test_input";
+// const int searchSpaceLimit = 20;
 
-// const int checkRow = 2_000_000;
-// const string fileName = "input";
-// const int searchSpaceLimit = 4_000_000;
+const int checkRow = 2_000_000;
+const string fileName = "input";
+const int searchSpaceLimit = 4_000_000;
 
 string[] lines = File.ReadAllLines(fileName);
 
@@ -50,9 +49,8 @@ static void DetectTuningFrequency(List<Instruction> instructions, int searchSpac
     Simulate(instructions);
 
     // (X,Y) of missing beacon must be between (0,0) and (searchSpaceLimit,searchSpaceLimit)
-    Position undetectedBeacon = Position.Zero;
+    Position missingBeacon = Position.Zero;
     int previousCount = 0;
-    bool lostBeaconFound = false;
 
     long was = DateTimeOffset.Now.ToUnixTimeMilliseconds();
 
@@ -74,14 +72,16 @@ static void DetectTuningFrequency(List<Instruction> instructions, int searchSpac
         int nextCount = occupiedRange.Ranges.Count;
 
         long now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
-        Console.WriteLine(
-            $"[{now - was}ms] Occupied Ranges: \n\tY: {row}\tX: {string.Join($"\n\tY: {row}\tX: ", occupiedRange.Ranges)}");
+        // Console.WriteLine($"[{now - was}ms | Y: {row}] Occupied Ranges: \n\tX: {string.Join($"\n\tX: ", occupiedRange.Ranges)}");
         was = now;
 
         if (nextCount > 1)
         {
-            Console.WriteLine($"[Y: {row}] FOUND SPLIT! {nextCount}");
-            //TODO Find beacon
+            // Console.WriteLine($"[Y: {row}] FOUND SPLIT! ({nextCount} segments) | Ranges: \n\tY: {row}\tX: {string.Join($"\n\tY: {row}\tX: ", occupiedRange.Ranges)}");
+
+            missingBeacon = new Position(occupiedRange.Ranges[0].End + 1, row);
+            
+            Console.WriteLine($"MISSING BEACON: [{missingBeacon}]");
         }
 
         Console.WriteLine($"No beacon found on row: {row} | PrevCount: {previousCount} vs NextCount: {nextCount}");
@@ -89,9 +89,8 @@ static void DetectTuningFrequency(List<Instruction> instructions, int searchSpac
     }
 
 
-    int tuningFrequency = (undetectedBeacon.X * frequencyMultiplier) + undetectedBeacon.Y;
-    Console.WriteLine(
-        $"Part 2: {undetectedBeacon.X} x {frequencyMultiplier} + {undetectedBeacon.Y} = <{tuningFrequency}>");
+    int tuningFrequency = (missingBeacon.X * frequencyMultiplier) + missingBeacon.Y;
+    Console.WriteLine($"Part 2: {missingBeacon.X} x {frequencyMultiplier} + {missingBeacon.Y} = <{tuningFrequency}>");
 }
 
 static IEnumerable<Position> OccupiedPositionsInRow(List<Instruction> instructions, int row)
@@ -308,11 +307,14 @@ internal readonly struct RangeCollection
         for (int i = 0; i < Ranges.Count; i++)
         {
             Range current = Ranges[i];
-            while (Ranges.FindIndex(r => r != current && r.CanAdd(current)) is var canAddIndex and >= 0)
+            if (Ranges.FindIndex(r => r != current && r.CanAdd(current)) is var canAddIndex and >= 0)
             {
                 Ranges[i] += Ranges[canAddIndex];
                 // Console.WriteLine($"Combining ranges: {Ranges[i]} + {Ranges[canAddIndex]} = {Ranges[i] + Ranges[canAddIndex]}");
                 Ranges.RemoveAt(canAddIndex);
+
+                CombineRanges();
+                return;
             }
         }
     }
