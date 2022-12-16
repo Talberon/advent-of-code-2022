@@ -71,11 +71,11 @@ static void DetectTuningFrequency(List<Instruction> instructions, int searchSpac
 
         if (rangeCount > 1)
         {
-            // Console.WriteLine($"[Y: {row}] FOUND SPLIT! ({nextCount} segments) | Ranges: \n\tY: {row}\tX: {string.Join($"\n\tY: {row}\tX: ", occupiedRange.Ranges)}");
 
-            missingBeacon = new Position(occupiedRange.Ranges[0].End + 1, row);
+            missingBeacon = new Position(occupiedRange.Ranges.MinBy(range => range.End).End + 1, row);
             
             Console.WriteLine($"MISSING BEACON: [{missingBeacon}]");
+            Console.WriteLine($"[Y: {row}] FOUND SPLIT! ({rangeCount} segments) | Ranges: \n\tY: {row}\tX: {string.Join($"\n\tY: {row}\tX: ", occupiedRange.Ranges)}");
             break;
         }
 
@@ -83,7 +83,7 @@ static void DetectTuningFrequency(List<Instruction> instructions, int searchSpac
     }
 
 
-    int tuningFrequency = (missingBeacon.X * frequencyMultiplier) + missingBeacon.Y;
+    long tuningFrequency = (missingBeacon.X * frequencyMultiplier) + missingBeacon.Y;
     Console.WriteLine($"Part 2: {missingBeacon.X} x {frequencyMultiplier} + {missingBeacon.Y} = <{tuningFrequency}>");
 }
 
@@ -246,7 +246,8 @@ class Sensor : GridItem
         int left = TruePosition.X - (Radius - originDistanceFromRow);
         int right = TruePosition.X + (Radius - originDistanceFromRow);
 
-        return new Range(Math.Max(0, left), Math.Min(rightSideLimit, right));
+        const int lowerLimit = 0;
+        return new Range(Math.Max(lowerLimit, left), Math.Min(rightSideLimit, right));
     }
 
     public List<Position> PositionsInRadius()
