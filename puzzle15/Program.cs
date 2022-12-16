@@ -22,7 +22,6 @@ using System.Text.RegularExpressions;
 
 const int frequencyMultiplier = 4_000_000;
 
-
 // const int checkRow = 10;
 // const string fileName = "test_input";
 // const int searchSpaceLimit = 20;
@@ -46,20 +45,15 @@ return;
 
 static void DetectTuningFrequency(List<Instruction> instructions, int searchSpaceLimit, int frequencyMultiplier)
 {
-    Simulate(instructions);
+    // Simulate(instructions);
 
     // (X,Y) of missing beacon must be between (0,0) and (searchSpaceLimit,searchSpaceLimit)
     Position missingBeacon = Position.Zero;
-    int previousCount = 0;
 
     long was = DateTimeOffset.Now.ToUnixTimeMilliseconds();
 
     for (int row = 0; row <= searchSpaceLimit; row++)
     {
-        IEnumerable<Position> knownBeaconsInRow =
-            instructions.Select(i => i.Beacon.TruePosition).Where(p => p.Y == row);
-        // Console.WriteLine($"Known beacons in row {knownBeaconsInRow.Count()}");
-
         RangeCollection occupiedRange = instructions
             .Where(instructions => instructions.Sensor.TruePosition.Y - instructions.Sensor.Radius <= row &&
                                    instructions.Sensor.TruePosition.Y + instructions.Sensor.Radius >= row
@@ -69,23 +63,23 @@ static void DetectTuningFrequency(List<Instruction> instructions, int searchSpac
                     ? total.AddRange(range)
                     : total);
 
-        int nextCount = occupiedRange.Ranges.Count;
+        int rangeCount = occupiedRange.Ranges.Count;
 
         long now = DateTimeOffset.Now.ToUnixTimeMilliseconds();
         // Console.WriteLine($"[{now - was}ms | Y: {row}] Occupied Ranges: \n\tX: {string.Join($"\n\tX: ", occupiedRange.Ranges)}");
         was = now;
 
-        if (nextCount > 1)
+        if (rangeCount > 1)
         {
             // Console.WriteLine($"[Y: {row}] FOUND SPLIT! ({nextCount} segments) | Ranges: \n\tY: {row}\tX: {string.Join($"\n\tY: {row}\tX: ", occupiedRange.Ranges)}");
 
             missingBeacon = new Position(occupiedRange.Ranges[0].End + 1, row);
             
             Console.WriteLine($"MISSING BEACON: [{missingBeacon}]");
+            break;
         }
 
-        Console.WriteLine($"No beacon found on row: {row} | PrevCount: {previousCount} vs NextCount: {nextCount}");
-        previousCount = nextCount;
+        if (row % 100_000 == 0) Console.WriteLine($"No beacon found on row: {row}");
     }
 
 
